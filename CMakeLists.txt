@@ -46,4 +46,6 @@ target_link_libraries(audio_client -lportaudio)
 
 if (OS_IS_WINDOWS)
   target_link_libraries(audio_client -lWinmm)
+elseif (OS_IS_LINUX)
+  target_link_libraries(audio_client -lpthread)
 endif ()
