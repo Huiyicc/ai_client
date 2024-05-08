@@ -1,0 +1,8 @@
+!.gitignore
+!build_*
+build/*
+include/*
+lib/*
+lib64/*
+share/*
+
