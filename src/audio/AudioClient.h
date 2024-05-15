@@ -21,7 +21,18 @@ typedef unsigned long PaStreamCallbackFlags;
 namespace AC {
 class AudioStream;
 
-typedef std::function<void(AudioStream* t,void* userData)> RecordCallback;
+/**
+ * 定义一个记录回调函数的类型。
+ *
+ * RecordCallback 是一个标准库 std::function 的模板实例，它指定了一个回调函数的签名。
+ * 这个回调函数接受两个参数：一个是指向 AudioStream 类型的指针，另一个是 void* 类型的用户数据指针。
+ * 回调函数没有返回值。
+ *
+ * @param t 指向 AudioStream 类型的指针，代表音频流对象，在回调中可以使用该对象进行相关操作。
+ * @param userData void* 类型的指针，代表用户自定义的数据。OpenStream传递
+ * @return 返回true放行,否则拦截
+ */
+typedef std::function<bool(AudioStream* t,void* userData)> RecordCallback;
 
 /**
  * 结构体AudioDevices用于描述音频设备的信息。
@@ -129,16 +140,27 @@ public:
  *
  * @param flitterSize 音量阈值，超过此值时开始录制，范围为[0, 1]，默认为0.02。
  * @param flitterFiltration 滤波灵敏度，数值越大越灵敏，默认为0.05。
- * @param flitterTime 没有声音后停止录制的等待时间，单位为毫秒，默认为2500。
+ * @param flitterTime 没有声音后停止录制的等待时间，单位为毫秒，默认为2800。
+ * @param maxSize 录制的最大大小,超过这个尺寸会清除数据,防止无限增大溢出
  */
   void Start(float flitterSize=0.02,
              float flitterFiltration=0.05,
-             uint32_t flitterTime=2500
+             uint32_t flitterTime=2800,
+             uint64_t maxSize=5000000
     );
 
   void Stop();
 
-  void SetCallback(const RecordCallback &callback);
+  /**
+ * 设置静音回调函数
+ * @param callback 静音状态变更时调用的回调函数，回调函数的具体定义见RecordCallback类型。
+ */
+  void SetMuteCallback(const RecordCallback &callback);
+  /**
+ * 设置开始录制回调函数
+ * @param callback 开始录制时调用的回调函数，回调函数的具体定义见RecordCallback类型。
+ */
+  void SetStartCallback(const RecordCallback &callback);
 
   void SaveData(const std::string &path, bool clear = true);
 
@@ -159,9 +181,12 @@ private:
   uint32_t m_framesPerBuffer = 0; // 每帧采样数
   float m_flitterSize=0.02;
   float m_flitterFiltration=0.05;
+  uint64_t m_maxSize=5000000;
   bool m_isRunning = false;
   std::shared_ptr<PaStreamParameters> m_params;
-  RecordCallback m_callback;
+  RecordCallback m_muteCallback; //静音回调
+  RecordCallback m_StartCallback; //静音回调
+
 
   AudioStream(int flitterSize,
               void *stream,

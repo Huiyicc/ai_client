@@ -36,7 +36,7 @@ AudioStream::AudioStream(int flitterSize,
   m_energyBuffer(flitterSize), m_isRunning(false) {
   m_stream = static_cast<PaStream *>(stream);
   m_userData = userData;
-  m_callback = callback;
+  m_muteCallback = callback;
   m_params = std::make_shared<PaStreamParameters>();
   *m_params = p;
   m_sampleRate = sampleRate;
@@ -116,22 +116,48 @@ int OnStreamCallBack(const void *inputBuffer,
                        _this->m_flitterFiltration)) {
         auto now = Timer::GetCurrentTimeMillis();
         if (now - _this->m_lastTime > _this->m_flitterTime) {
+          bool r = true;
+          if (_this->m_muteCallback) {
+            r = _this->m_muteCallback(_this, _user);
+          }
           _this->m_lastTime = now;
           // 防止爆闪
           _this->m_records = false;
           _this->m_insert = false;
-          if (_this->m_callback) {
-            _this->m_callback(_this, _user);
-          }
         }
       }
     } else {
-      // 没开始录音,超过阈值开始录音
+      // 没开始录音,超过阈值
       if (v > _this->m_flitterSize) {
-        _this->m_records = true;
-        _this->m_insert = true;
-        _this->m_scanIndex = 0;
-        _this->m_pcmData.clear();
+        // 滤波,防止瞬时噪音
+        if (flitterFunc(_this->m_energyBuffer.getOrdered(),
+                        _this->m_flitterSize,
+                        0.5)) {
+          bool r = true;
+          if (_this->m_StartCallback) {
+            r = _this->m_StartCallback(_this, _user);
+          }
+          if (r) {
+            _this->m_records = true;
+            _this->m_insert = true;
+          }
+        }
+      }else {
+        // 保留前reNum次采样的数据
+        uint32_t reNum = 3;
+        // 最大预存尺寸
+        uint32_t maxIndex = reNum * fNum;
+        if (_this->m_scanIndex >= maxIndex) {
+          std::vector<short> tempV(maxIndex);
+          tempV.clear();
+          tempV.insert(tempV.end(), _this->m_pcmData.begin() + fNum, _this->m_pcmData.end());
+          _this->m_scanIndex = tempV.size();
+          _this->m_pcmData.clear();
+          _this->m_pcmData.insert(_this->m_pcmData.end(), tempV.begin(), tempV.end());
+          _this->m_insert = true;
+        } else {
+          _this->m_insert = true;
+        }
       }
     }
   }
@@ -139,16 +165,22 @@ int OnStreamCallBack(const void *inputBuffer,
     _this->m_pcmData.insert(_this->m_pcmData.end(), rprt, rprt + framesPerBuffer * _this->m_params->channelCount);
     if (_this->m_pcmData.size() >= 10000) {
       _this->m_scanIndex += static_cast<int32_t>(framesPerBuffer * _this->m_params->channelCount);
+      if (_this->m_pcmData.size() >= _this->m_maxSize) {
+        _this->m_scanIndex = 0;
+        _this->m_pcmData.clear();
+      }
     }
   }
+
   return 0;
 }
 
-void AudioStream::Start(float flitterSize, float flitterFiltration,uint32_t flitterTime) {
+void AudioStream::Start(float flitterSize, float flitterFiltration, uint32_t flitterTime, uint64_t maxSize) {
   m_lastTime = Timer::GetCurrentTimeMillis();
   m_flitterSize = flitterSize;
   m_flitterFiltration = flitterFiltration;
   m_flitterTime = flitterTime;
+  m_maxSize = maxSize;
   m_datas[0] = this;
   m_datas[1] = m_userData;
   auto err = Pa_OpenStream(
@@ -190,7 +222,7 @@ void AudioStream::SaveData(const std::string &path, bool clear) {
   ww.finishWriting();
   if (clear) {
     m_pcmData.clear();
-  }
+    m_scanIndex = 0;  }
 };
 
 const std::vector<short> &AudioStream::GetPcmData() {
@@ -218,8 +250,12 @@ void AudioStream::Stop() {
   }
 }
 
-void AudioStream::SetCallback(const RecordCallback &callback) {
-  m_callback = callback;
+void AudioStream::SetMuteCallback(const RecordCallback &callback) {
+  m_muteCallback = callback;
+};
+
+void AudioStream::SetStartCallback(const RecordCallback &callback) {
+  m_StartCallback = callback;
 };
 
 // =========================

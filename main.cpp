@@ -8,11 +8,16 @@ int main() {
   auto dev = AC::AudioClient::GetDefaultInputDevice();
   PrintDebug("default input device: {}", dev.Name.c_str());
   auto s = cli->OpenStream(dev);
-  s.SetCallback([](AC::AudioStream *stream, void *userData) {
+  s.SetMuteCallback([](AC::AudioStream *stream, void *userData)->bool {
     stream->SaveData("re.wav", true);
     PrintInfo("saved");
+    return true;
   });
-  std::thread a([&]() { s.Start(); });
+  s.SetStartCallback([](AC::AudioStream *stream, void *userData)->bool {
+    PrintInfo("start");
+    return true;
+  });
+  std::thread a([&]() { s.Start(0.02,0.05,3000); });
   std::this_thread::sleep_for(std::chrono::seconds(5));
 
   while (true) {
