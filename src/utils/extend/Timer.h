@@ -5,9 +5,13 @@
 #ifndef HYDUI_TIMER_H
 #define HYDUI_TIMER_H
 
-namespace HYDUI::Timer {
+#include <cstdint>
+
+namespace AC::Timer {
 
 void SleepMilliseconds(int ms);
+
+uint64_t GetCurrentTimeMillis();
 
 } // HYDUI
 

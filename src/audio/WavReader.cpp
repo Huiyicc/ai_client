@@ -7,6 +7,12 @@
 
 #include "WavReader.h"
 
+#ifdef _HOST_WINDOWS_
+#define hopen [](const char *path, const char *mode) -> FILE * { FILE *f = nullptr; fopen_s(&f, path, mode); return f; }
+#else
+#define hopen fopen
+#endif
+
 namespace AC {
 
 
@@ -36,7 +42,7 @@ WavReader::~WavReader() {
 bool WavReader::initialize(const char *readFilePath) {
 
   //Test for file existence...
-  FILE *f = fopen(readFilePath, "r");
+  FILE *f = hopen(readFilePath, "r");
   if (!f) {
     fprintf(stderr, "File: %s doesn't exist.\n", readFilePath);
     return false;
@@ -64,7 +70,7 @@ bool WavReader::openFile() {
   }
 
   if (!readFile) {
-    readFile = fopen(readFilePath, "rb");
+    readFile = hopen(readFilePath.c_str(), "rb");
     if (readFile == NULL) {
       fprintf(stderr, "Error: Unable to open input file for reading.\n");
       readFile = nullptr;
@@ -559,11 +565,11 @@ bool WavReader::readInt16SampleFromArray(const uint8_t sampleData[],
 
 
 
-const char *WavReader::getReadFilePath() {
+std::string_view WavReader::getReadFilePath() {
 
   if (!initialized) {
     fprintf(stderr, "%s", UNINITIALIZED_MSG);
-    return nullptr;
+    return "";
   }
 
   return readFilePath;

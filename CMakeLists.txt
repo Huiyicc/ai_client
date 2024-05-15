@@ -3,6 +3,8 @@ project(audio_client)
 
 set(CMAKE_CXX_STANDARD 17)
 
+add_definitions("-g")
+
 file(GLOB_RECURSE SRC_FILES src/*.cpp)
 file(GLOB_RECURSE SRC_FILES_CC src/*.cc)
 
@@ -45,7 +47,7 @@ add_executable(audio_client ${SRC_FILES} ${SRC_FILES_CC} main.cpp)
 target_link_libraries(audio_client -lportaudio)
 
 if (OS_IS_WINDOWS)
-  target_link_libraries(audio_client -lWinmm)
+  target_link_libraries(audio_client -lWinmm )
 elseif (OS_IS_LINUX)
   target_link_libraries(audio_client -lpthread)
 endif ()

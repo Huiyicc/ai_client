@@ -10,14 +10,18 @@
 #include <cstdint>
 #include <memory>
 #include <functional>
+#include "Algorithm/CircularBuffer.h"
 
 struct PaDeviceInfo;
 struct PaStreamCallbackTimeInfo;
 struct PaStreamParameters;
 typedef unsigned long PaStreamCallbackFlags;
 
+
 namespace AC {
 class AudioStream;
+
+typedef std::function<void(AudioStream* t,void* userData)> RecordCallback;
 
 /**
  * 结构体AudioDevices用于描述音频设备的信息。
@@ -97,11 +101,12 @@ public:
   static AudioDevices GetDefaultInputDevice();
 
   AudioStream OpenStream(const AudioDevices &inputDevice,
+                         int flitterSize=30,
                          uint32_t sampleRate = 44100,
                          uint32_t framesPerBuffer = 512,
-                         int channelCount = 2,
+                         int channelCount = 1,
                          void *userData = nullptr,
-                         const std::function<void(void *, const void *, unsigned long)> &callback = nullptr);
+                         const RecordCallback &callback = nullptr);
 
 private:
   AudioClient();
@@ -114,31 +119,72 @@ private:
 
 class AudioStream {
 public:
-  void Start();
+
+  /**
+ * @brief 启动音频录制功能，根据设置的参数动态管理录制状态。
+ *
+ * 当音量超过`flitterSize`（最大值为1）时开始录制，低于该阈值时停止录制。
+ * `flitterFiltration`表示滤波器的灵敏度，值越大意味着对音量变化的响应越灵敏。
+ * 如果在`flitterTime`毫秒内未检测到声音，会自动停止录制。
+ *
+ * @param flitterSize 音量阈值，超过此值时开始录制，范围为[0, 1]，默认为0.02。
+ * @param flitterFiltration 滤波灵敏度，数值越大越灵敏，默认为0.05。
+ * @param flitterTime 没有声音后停止录制的等待时间，单位为毫秒，默认为2500。
+ */
+  void Start(float flitterSize=0.02,
+             float flitterFiltration=0.05,
+             uint32_t flitterTime=2500
+    );
 
   void Stop();
 
-  void SaveData(const std::string &path,bool clear=true);
+  void SetCallback(const RecordCallback &callback);
+
+  void SaveData(const std::string &path, bool clear = true);
+
+  [[nodiscard]] int32_t GetScanIndex() const;
+
+  void SetScanIndex(int32_t i);
+
+  [[nodiscard]] const std::vector<short>& GetPcmData();
 
 private:
+  bool m_insert = false;
+  uint64_t m_lastTime = 0;
+  uint32_t m_flitterTime = 2500;
+  bool m_records = false;
   void *m_stream = nullptr;
   void *m_userData = nullptr;
   uint32_t m_sampleRate = 0; // 采样率
   uint32_t m_framesPerBuffer = 0; // 每帧采样数
+  float m_flitterSize=0.02;
+  float m_flitterFiltration=0.05;
   bool m_isRunning = false;
   std::shared_ptr<PaStreamParameters> m_params;
-  std::function<void(void *, const void *, unsigned long)> m_callback;
+  RecordCallback m_callback;
 
-  AudioStream(void *stream,
+  AudioStream(int flitterSize,
+              void *stream,
               void *userData,
               PaStreamParameters p,
               uint32_t sampleRate,
               uint32_t framesPerBuffer,
-              const std::function<void(void *, const void *, unsigned long)> &callback);
+              const RecordCallback &callback);
 
   friend class AudioClient;
-  void* m_datas[2]={nullptr};
-  std::vector<uint16_t> m_pcmData;
+
+  void *m_datas[2] = {nullptr};
+  std::vector<short> m_pcmData;
+  int32_t m_scanIndex = 0;
+  Algorithm::CircularBuffer<float> m_energyBuffer;
+
+  friend
+  int OnStreamCallBack(const void *inputBuffer,
+                       void *outputBuffer,
+                       unsigned long framesPerBuffer,
+                       const PaStreamCallbackTimeInfo *timeInfo,
+                       PaStreamCallbackFlags statusFlags,
+                       void *sysData);
 };
 
 } // AC

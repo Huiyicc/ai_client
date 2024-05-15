@@ -1,10 +1,11 @@
 //WavReader.hpp
 
-#ifndef __WAV_READER_HPP__
-#define __WAV_READER_HPP__
+#ifndef __WAV_READERFILE_HPP__
+#define __WAV_READERFILE_HPP__
 
 #include <cstdio> //For FILE
 #include <cstdint> //For uint8_t, etc.
+#include <string>
 
 #include "WavHeader.h"
 
@@ -36,7 +37,7 @@ public:
                                 int16_t &int16SampleCh1,
                                 int16_t &int16SampleCh2);
 
-  const char* getReadFilePath();
+  std::string_view getReadFilePath();
   uint32_t getSampleRate();
   uint32_t getNumSamples();
   uint32_t getNumChannels();
@@ -55,7 +56,7 @@ private:
 
   bool findSubchunk(const char* subchunkId, uint32_t* subchunkSize);
 
-  char* readFilePath;
+  std::string readFilePath;
   FILE* readFile;
 
   //Metadata

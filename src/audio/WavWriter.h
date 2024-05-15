@@ -1,11 +1,13 @@
-//WavWriter.hpp
+//WavWriterFile.hpp
 
-#ifndef __WAV_WRITER_HPP__
-#define __WAV_WRITER_HPP__
+#ifndef __WAV_WRITERFILE_HPP__
+#define __WAV_WRITERFILE_HPP__
 
 
 #include <cstdio> //For FILE
 #include <cstdint> //For uint8_t, etc.
+#include <string> //For uint8_t, etc.
+#include <fstream>
 
 #include "WavHeader.h"
 namespace AC {
@@ -40,7 +42,7 @@ public:
                                const uint8_t sampleData[], //Wav format bytes; samples interleaved if multiple channels
                                uint32_t sampleDataSize);
 
-  const char *getWriteFilePath();
+  std::string_view getWriteFilePath();
 
   uint32_t getSampleRate();
 
@@ -64,7 +66,7 @@ private:
 
   bool findSubchunk(const char *subchunkId);
 
-  const char *writeFilePath;
+  std::string writeFilePath;
   FILE *writeFile;
 
   uint32_t sampleRate;

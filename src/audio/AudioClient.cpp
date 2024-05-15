@@ -1,16 +1,16 @@
 //
 // Created by 19254 on 24-5-6.
 //
-#include <iomanip>
 #include <fstream>
 #include <thread>
 #include "AudioClient.h"
 #include "portaudio.h"
 #include "stdexcept"
 #include "extend/Logger.h"
-
+#include "Algorithm/CircularBuffer.h"
 #include "WavWriter.h"
 #include "extend/Defer.h"
+#include "extend/Timer.h"
 
 namespace AC {
 
@@ -26,12 +26,14 @@ AudioDevices::AudioDevices(int index, const PaDeviceInfo *info) {
 
 // =========================
 
-AudioStream::AudioStream(void *stream,
+AudioStream::AudioStream(int flitterSize,
+                         void *stream,
                          void *userData,
                          PaStreamParameters p,
                          uint32_t sampleRate,
                          uint32_t framesPerBuffer,
-                         const std::function<void(void *, const void *, unsigned long)> &callback) {
+                         const RecordCallback &callback) :
+  m_energyBuffer(flitterSize), m_isRunning(false) {
   m_stream = static_cast<PaStream *>(stream);
   m_userData = userData;
   m_callback = callback;
@@ -41,32 +43,112 @@ AudioStream::AudioStream(void *stream,
   m_framesPerBuffer = framesPerBuffer;
 };
 
-void AudioStream::Start() {
-  auto call = [](const void *inputBuffer,
-                 void *outputBuffer,
-                 unsigned long framesPerBuffer,
-                 const PaStreamCallbackTimeInfo *timeInfo,
-                 PaStreamCallbackFlags statusFlags,
-                 void *sysData) -> int {
-    auto datas = static_cast<void **>(sysData);
-    auto _this = static_cast<AudioStream *>(datas[0]);
-    auto _user = datas[1];
+int32_t AudioStream::GetScanIndex() const {
+  return m_scanIndex;
+};
 
-    auto rprt = (const uint16_t *)inputBuffer;
+void AudioStream::SetScanIndex(int32_t i) {
+  m_scanIndex = i;
+};
 
+int OnStreamCallBack(const void *inputBuffer,
+                     void *outputBuffer,
+                     unsigned long framesPerBuffer,
+                     const PaStreamCallbackTimeInfo *timeInfo,
+                     PaStreamCallbackFlags statusFlags,
+                     void *sysData) {
+// 返回false未超过阈值,也就是说是静音
+  // 返回true超过阈值,也就是说是有声音
 
-    _this->m_pcmData.insert(_this->m_pcmData.end(), rprt, rprt + framesPerBuffer*_this->m_params->channelCount);
-
-    if (_this->m_pcmData.size() >= 512000) {
-      _this->SaveData("recorded_audio.wav");
-      auto l = std::thread([_this](){
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        _this->Stop();
-      });
-      l.detach();
+  /**
+   * @param datas 总数据
+   * @param f 阈值
+   * @param ft 容错分数,0-1,相当于datas.size()的百分比
+   */
+  auto flitterFunc = [](const std::vector<float> &datas, float f, float ft) -> bool {
+    // 容错分数
+    int c = datas.size() * ft;
+    c = std::max(c, 0);
+    // 判断是否超过阈值
+    bool r = false;
+    for (auto &i: datas) {
+      if (i > f) {
+        c--;
+        if (c <= 0) {
+          r = true;
+          break;
+        }
+        continue;
+      }
     }
-    return 0;
+    return r;
   };
+  auto datas = static_cast<void **>(sysData);
+  auto _this = static_cast<AudioStream *>(datas[0]);
+  auto _user = datas[1];
+
+  auto rprt = (const short *) inputBuffer;
+
+  auto minPcm = std::numeric_limits<const short>::min();
+  auto maxPcm = std::numeric_limits<const short>::max();
+  auto middle = (maxPcm + minPcm) / 2;
+
+  auto fNum = framesPerBuffer * _this->m_params->channelCount;
+  float total = 0;
+  float v = 0;
+  for (size_t i = 0; i < fNum; ++i) {
+    auto tt = rprt[i];
+    if (rprt[i] > middle) {
+      v = static_cast<float>(rprt[i]) / static_cast<float>(maxPcm);
+    } else {
+      v = (static_cast<float>(fabs(rprt[i])) / static_cast<float>(fabs(minPcm)));
+    }
+    total += v;
+  }
+  v = total / static_cast<float>(fNum);
+  //PrintDebug("energy: {}", v);
+  _this->m_energyBuffer.push(v);
+  if (_this->m_energyBuffer.isFull()) {
+    if (_this->m_records) {
+      // 正在录音,滤波不通过取消录音
+      if (!flitterFunc(_this->m_energyBuffer.getOrdered(),
+                       _this->m_flitterSize,
+                       _this->m_flitterFiltration)) {
+        auto now = Timer::GetCurrentTimeMillis();
+        if (now - _this->m_lastTime > _this->m_flitterTime) {
+          _this->m_lastTime = now;
+          // 防止爆闪
+          _this->m_records = false;
+          _this->m_insert = false;
+          if (_this->m_callback) {
+            _this->m_callback(_this, _user);
+          }
+        }
+      }
+    } else {
+      // 没开始录音,超过阈值开始录音
+      if (v > _this->m_flitterSize) {
+        _this->m_records = true;
+        _this->m_insert = true;
+        _this->m_scanIndex = 0;
+        _this->m_pcmData.clear();
+      }
+    }
+  }
+  if (_this->m_insert || _this->m_records) {
+    _this->m_pcmData.insert(_this->m_pcmData.end(), rprt, rprt + framesPerBuffer * _this->m_params->channelCount);
+    if (_this->m_pcmData.size() >= 10000) {
+      _this->m_scanIndex += static_cast<int32_t>(framesPerBuffer * _this->m_params->channelCount);
+    }
+  }
+  return 0;
+}
+
+void AudioStream::Start(float flitterSize, float flitterFiltration,uint32_t flitterTime) {
+  m_lastTime = Timer::GetCurrentTimeMillis();
+  m_flitterSize = flitterSize;
+  m_flitterFiltration = flitterFiltration;
+  m_flitterTime = flitterTime;
   m_datas[0] = this;
   m_datas[1] = m_userData;
   auto err = Pa_OpenStream(
@@ -76,7 +158,7 @@ void AudioStream::Start() {
     m_sampleRate,
     m_framesPerBuffer,
     paClipOff,
-    call,
+    OnStreamCallBack,
     &m_datas
   );
   if (err != paNoError) {
@@ -95,28 +177,29 @@ void AudioStream::Start() {
     throw std::runtime_error(out);
   }
   m_isRunning = true;
-  while (true) {
-    if (!m_isRunning) {
-      break;
-    }
-    Pa_Sleep(1000);
-  }
 }
 
 void AudioStream::SaveData(const std::string &path, bool clear) {
   WavWriter ww;
   ww.initialize(path.c_str(),
-                 m_sampleRate,
-                 m_params->channelCount
-                 , true, 2);
+                m_sampleRate,
+                m_params->channelCount, true, 2);
   ww.startWriting();
-  ww.writeData((uint8_t*)m_pcmData.data(), m_pcmData.size()*sizeof(uint16_t));
+  //ww.writeData((uint8_t *) m_pcmData.data(), m_pcmData.size() * sizeof(uint16_t));
+  ww.writeDataFromInt16s(m_pcmData.data(), m_pcmData.size());
   ww.finishWriting();
+  if (clear) {
+    m_pcmData.clear();
+  }
+};
+
+const std::vector<short> &AudioStream::GetPcmData() {
+  return m_pcmData;
 };
 
 void AudioStream::Stop() {
   if (m_isRunning) {
-    DEFER({m_isRunning = false;});
+    DEFER({ m_isRunning = false; });
     auto err = Pa_StopStream(m_stream);
     if (err != paNoError) {
       std::string out = "stop audio stream failed,";
@@ -134,6 +217,10 @@ void AudioStream::Stop() {
 
   }
 }
+
+void AudioStream::SetCallback(const RecordCallback &callback) {
+  m_callback = callback;
+};
 
 // =========================
 
@@ -187,18 +274,19 @@ AudioDevices AudioClient::GetDefaultInputDevice() {
 }
 
 AudioStream AudioClient::OpenStream(const AudioDevices &inputDevice,
+                                    int flitterSize,
                                     uint32_t sampleRate,
                                     uint32_t framesPerBuffer,
                                     int channelCount,
                                     void *userData,
-                                    const std::function<void(void *, const void *, unsigned long)> &callback) {
+                                    const RecordCallback &callback) {
   PaStreamParameters inputParameters;
   inputParameters.device = inputDevice.ID;
   inputParameters.channelCount = channelCount;
   inputParameters.sampleFormat = paInt16;
   inputParameters.suggestedLatency = inputDevice.DefaultLowInputLatency;
   inputParameters.hostApiSpecificStreamInfo = nullptr;
-  return {nullptr, userData, inputParameters, sampleRate, framesPerBuffer, callback};
+  return {flitterSize, nullptr, userData, inputParameters, sampleRate, framesPerBuffer, callback};
 }
 
 } // AC

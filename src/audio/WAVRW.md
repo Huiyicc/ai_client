@@ -25,7 +25,7 @@ wr->finishReading();
 ```cpp
 #include "WavWriter.hpp"
 ...
-auto wr = AC::WavReader();
+auto wr = AC::WavWriter();
 ww->initialize(outputWavFilePath,
                sampleRate,
                numChannels,  // 1 || 2 ,通道数

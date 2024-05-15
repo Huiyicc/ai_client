@@ -7,6 +7,7 @@
 #include "WavWriter.h"
 
 namespace AC {
+
 static const char *UNINITIALIZED_MSG = "Attempt to call WavWriter class method before calling initialize().\n";
 
 static const uint64_t MAX_UINT32 = 4294967295;
@@ -82,7 +83,7 @@ bool WavWriter::openFile() {
   }
 
   if (!writeFile) {
-    writeFile = fopen(writeFilePath, "w+b");
+    writeFile = fopen(writeFilePath.c_str(), "w+b");
     if (writeFile == NULL) {
       fprintf(stderr, "Error: Unable to open output file for writing.\n");
       writeFile = nullptr;
@@ -481,11 +482,11 @@ bool WavWriter::writeInt16SampleToArray(int16_t int16SampleCh1,
 
 
 
-const char *WavWriter::getWriteFilePath() {
+std::string_view WavWriter::getWriteFilePath() {
 
   if (!initialized) {
     fprintf(stderr, "%s", UNINITIALIZED_MSG);
-    return nullptr;
+    return "";
   }
 
   return writeFilePath;

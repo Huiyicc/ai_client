@@ -12,11 +12,11 @@
 namespace HYDUI {
 
 #ifdef _HOST_WINDOWS_
-#define LOCALTIME(time_str)                                                          \
-  auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); \
-  std::tm tm_info = {0};                                                             \
-  localtime_s(&tm_info, &now);                                                       \
-  strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_info);
+#define LOCALTIME(__time_str__)                                                          \
+  auto __now__ = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); \
+  std::tm __tm_info__ = {0};                                                             \
+  localtime_s(&__tm_info__, &__now__);                                                       \
+  strftime(__time_str__, sizeof(__time_str__), "%Y-%m-%d %H:%M:%S", &__tm_info__);
 
 #else
 #define LOCALTIME(time_str)    \
@@ -27,34 +27,34 @@ namespace HYDUI {
 
 #endif
 
-#define PrintInfo(fstr, ...)                                                           \
+#define PrintInfo(fstr, ...)                                                          \
   do {                                                                                 \
-    char time_str[32];                                                                 \
-    LOCALTIME(time_str);                                                               \
-    std::string lstr = "<{}> [{}:{}] ";                                            \
-    std::string_view fPath = __FILE__;                                                 \
-    fPath = fPath.substr(strlen(PRIOJECT_PATH), fPath.size() - strlen(PRIOJECT_PATH)); \
-    std::cout << fmt::format(lstr + std::string(fstr), time_str, fPath, __LINE__, ##__VA_ARGS__)<< std::endl;  \
+    char __time_str__F__[32];                                                                 \
+    LOCALTIME(__time_str__F__);                                                               \
+    std::string __lstr__ = "<I> <{}> [{}:{}] ";                                            \
+    std::string_view __fPath__ = __FILE__;                                                 \
+    __fPath__ = __fPath__.substr(strlen(PRIOJECT_PATH), __fPath__.size() - strlen(PRIOJECT_PATH)); \
+    std::cout << fmt::format(__lstr__ + std::string(fstr), __time_str__F__, __fPath__, __LINE__, ##__VA_ARGS__)<< std::endl; \
   } while (0)
 
 #define PrintDebug(fstr, ...)                                                          \
   do {                                                                                 \
-    char time_str[32];                                                                 \
-    LOCALTIME(time_str);                                                               \
-    std::string lstr = "<{}> [{}:{}] ";                                            \
-    std::string_view fPath = __FILE__;                                                 \
-    fPath = fPath.substr(strlen(PRIOJECT_PATH), fPath.size() - strlen(PRIOJECT_PATH)); \
-    std::cout << fmt::format(lstr + std::string(fstr), time_str, fPath, __LINE__, ##__VA_ARGS__)<< std::endl; \
+    char __time_str__F__[32];                                                                 \
+    LOCALTIME(__time_str__F__);                                                               \
+    std::string __lstr__ = "<D> <{}> [{}:{}] ";                                            \
+    std::string_view __fPath__ = __FILE__;                                                 \
+    __fPath__ = __fPath__.substr(strlen(PRIOJECT_PATH), __fPath__.size() - strlen(PRIOJECT_PATH)); \
+    std::cout << fmt::format(__lstr__ + std::string(fstr), __time_str__F__, __fPath__, __LINE__, ##__VA_ARGS__)<< std::endl; \
   } while (0)
 
 #define PrintError(fstr, ...)                                                          \
   do {                                                                                 \
-    char time_str[32];                                                                 \
-    LOCALTIME(time_str);                                                               \
-    std::string lstr = "<{}> [{}:{}] ";                                            \
-    std::string_view fPath = __FILE__;                                                 \
-    fPath = fPath.substr(strlen(PRIOJECT_PATH), fPath.size() - strlen(PRIOJECT_PATH)); \
-    std::cerr << fmt::format(lstr + std::string(fstr), time_str, fPath, __LINE__, ##__VA_ARGS__)<< std::endl; \
+    char __time_str__F__[32];                                                                 \
+    LOCALTIME(__time_str__F__);                                                               \
+    std::string __lstr__ = "<E> <{}> [{}:{}] ";                                            \
+    std::string_view __fPath__ = __FILE__;                                                 \
+    __fPath__ = __fPath__.substr(strlen(PRIOJECT_PATH), __fPath__.size() - strlen(PRIOJECT_PATH)); \
+    std::cerr << fmt::format(__lstr__ + std::string(fstr), __time_str__F__, __fPath__, __LINE__, ##__VA_ARGS__)<< std::endl; \
   } while (0)
 
 
