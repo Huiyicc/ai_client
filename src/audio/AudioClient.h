@@ -101,11 +101,11 @@ public:
   static AudioDevices GetDefaultInputDevice();
 
   AudioStream OpenStream(const AudioDevices &inputDevice,
+                         void *userData = nullptr,
                          int flitterSize=30,
                          uint32_t sampleRate = 44100,
                          uint32_t framesPerBuffer = 512,
                          int channelCount = 1,
-                         void *userData = nullptr,
                          const RecordCallback &callback = nullptr);
 
 private:

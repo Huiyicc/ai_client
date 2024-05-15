@@ -274,11 +274,11 @@ AudioDevices AudioClient::GetDefaultInputDevice() {
 }
 
 AudioStream AudioClient::OpenStream(const AudioDevices &inputDevice,
+                                    void *userData,
                                     int flitterSize,
                                     uint32_t sampleRate,
                                     uint32_t framesPerBuffer,
                                     int channelCount,
-                                    void *userData,
                                     const RecordCallback &callback) {
   PaStreamParameters inputParameters;
   inputParameters.device = inputDevice.ID;
