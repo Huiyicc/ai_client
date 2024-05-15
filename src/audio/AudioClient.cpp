@@ -57,9 +57,6 @@ int OnStreamCallBack(const void *inputBuffer,
                      const PaStreamCallbackTimeInfo *timeInfo,
                      PaStreamCallbackFlags statusFlags,
                      void *sysData) {
-// 返回false未超过阈值,也就是说是静音
-  // 返回true超过阈值,也就是说是有声音
-
   /**
    * @param datas 总数据
    * @param f 阈值
@@ -143,6 +140,7 @@ int OnStreamCallBack(const void *inputBuffer,
           }
         }
       }else {
+        // 因为过滤了短暂的爆音,但是这种过滤会导致丢掉说话开始时的一秒左右数据,所以要一个预存
         // 保留前reNum次采样的数据
         uint32_t reNum = 3;
         // 最大预存尺寸
