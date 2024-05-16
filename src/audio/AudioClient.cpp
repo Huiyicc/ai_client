@@ -129,7 +129,7 @@ int OnStreamCallBack(const void *inputBuffer,
         // 滤波,防止瞬时噪音
         if (flitterFunc(_this->m_energyBuffer.getOrdered(),
                         _this->m_flitterSize,
-                        0.5)) {
+                        0.7)) {
           bool r = true;
           if (_this->m_StartCallback) {
             r = _this->m_StartCallback(_this, _user);
