@@ -1,3 +1,9 @@
 [submodule "lib/portaudio"]
 	path = lib/portaudio
 	url = https://github.com/PortAudio/portaudio.git
+[submodule "lib/httplib"]
+	path = lib/httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "lib/nlohmannjson"]
+	path = lib/nlohmannjson
+	url = https://github.com/nlohmann/json
