@@ -8,7 +8,7 @@
 
 namespace AC {
 
-void HttpClient::throw_error(const httplib::Result& res) {
+void HttpClient::throw_error(const httplib::Result &res) {
   if (res.error() == httplib::Error::Success) {
     return;
   }
@@ -48,6 +48,10 @@ HttpClient::HttpClient(std::string_view url) {
 }
 
 std::string HttpClient::Get() {
+  return Get(m_uri);
+}
+
+std::string HttpClient::Get(std::string_view path) {
   std::string resp;
   httplib::Result res;
   httplib::Headers headers = {
@@ -55,39 +59,47 @@ std::string HttpClient::Get() {
   };
   if (m_ssl) {
     httplib::SSLClient cli(m_host);
-    res = cli.Get(m_uri, headers);
+    res = cli.Get(path.data(), headers);
   } else {
     httplib::Client cli(m_host);
-    res = cli.Get(m_uri, headers);
+    res = cli.Get(path.data(), headers);
   }
   throw_error(res);
   return res->body;
 }
 
 std::string HttpClient::UpFile(const httplib::MultipartFormDataItems &items) {
-httplib::Result res;
+  return UpFile(m_uri, items);
+}
+
+std::string HttpClient::UpFile(std::string_view path, const httplib::MultipartFormDataItems &items) {
+  httplib::Result res;
   if (m_ssl) {
     httplib::SSLClient cli(m_host);
     res = cli.Post(m_uri, items);
   } else {
     httplib::Client cli(m_host);
-    res = cli.Post(m_uri, items);
+    res = cli.Post(path.data(), items);
+  }
+  throw_error(res);
+  return res->body;
+}
+
+std::string HttpClient::PostJson(std::string_view path, nlohmann::json &json) {
+  httplib::Result res;
+  if (m_ssl) {
+    httplib::SSLClient cli(m_host);
+    res = cli.Post(path.data(), json.dump(), "application/json");
+  } else {
+    httplib::Client cli(m_host);
+    res = cli.Post(path.data(), json.dump(), "application/json");
   }
   throw_error(res);
   return res->body;
 }
 
 std::string HttpClient::PostJson(nlohmann::json &json) {
-  httplib::Result res;
-  if (m_ssl) {
-    httplib::SSLClient cli(m_host);
-    res = cli.Post(m_uri, json.dump(), "application/json");
-  } else {
-    httplib::Client cli(m_host);
-    res = cli.Post(m_uri, json.dump(), "application/json");
-  }
-  throw_error(res);
-  return res->body;
+  return PostJson(m_uri, json);
 }
 
 } // AC
